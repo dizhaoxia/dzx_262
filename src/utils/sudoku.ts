@@ -4,6 +4,7 @@ export interface Cell {
   value: number;
   isFixed: boolean;
   isConflict: boolean;
+  isHint?: boolean;
 }
 
 function shuffle<T>(array: T[]): T[] {
@@ -94,6 +95,17 @@ function getDifficultyRange(difficulty: Difficulty): [number, number] {
   }
 }
 
+export function getHintLimit(difficulty: Difficulty): number {
+  switch (difficulty) {
+    case 'easy':
+      return 10;
+    case 'medium':
+      return 8;
+    case 'hard':
+      return 5;
+  }
+}
+
 export function generatePuzzle(difficulty: Difficulty): { puzzle: number[][]; solution: number[][] } {
   const solution = generateFullBoard();
   const puzzle = solution.map(row => [...row]);
@@ -121,6 +133,35 @@ export function generatePuzzle(difficulty: Difficulty): { puzzle: number[][]; so
   }
   
   return { puzzle, solution };
+}
+
+export function getCandidates(board: Cell[][], row: number, col: number): number[] {
+  if (board[row][col].value !== 0) return [];
+  
+  const used = new Set<number>();
+  
+  for (let i = 0; i < 9; i++) {
+    if (board[row][i].value !== 0) used.add(board[row][i].value);
+  }
+  
+  for (let i = 0; i < 9; i++) {
+    if (board[i][col].value !== 0) used.add(board[i][col].value);
+  }
+  
+  const boxRow = Math.floor(row / 3) * 3;
+  const boxCol = Math.floor(col / 3) * 3;
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      const val = board[boxRow + i][boxCol + j].value;
+      if (val !== 0) used.add(val);
+    }
+  }
+  
+  const candidates: number[] = [];
+  for (let num = 1; num <= 9; num++) {
+    if (!used.has(num)) candidates.push(num);
+  }
+  return candidates;
 }
 
 export function checkConflicts(board: Cell[][]): boolean {
@@ -215,6 +256,34 @@ export function createBoardFromPuzzle(puzzle: number[][]): Cell[][] {
       value,
       isFixed: value !== 0,
       isConflict: false,
+      isHint: false,
     }))
   );
+}
+
+export function cloneBoard(board: Cell[][]): Cell[][] {
+  return board.map(row =>
+    row.map(cell => ({ ...cell }))
+  );
+}
+
+export function countNumbers(board: Cell[][]): Record<number, number> {
+  const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const val = board[row][col].value;
+      if (val !== 0) counts[val]++;
+    }
+  }
+  return counts;
+}
+
+export function getFilledCount(board: Cell[][]): number {
+  let count = 0;
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      if (board[row][col].value !== 0) count++;
+    }
+  }
+  return count;
 }
