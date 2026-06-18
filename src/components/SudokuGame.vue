@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue';
+import { onMounted, onUnmounted, computed, ref } from 'vue';
 import { useGame } from '@/composables/useGame';
 import SudokuBoard from '@/components/SudokuBoard.vue';
 import NumberPad from '@/components/NumberPad.vue';
@@ -8,6 +8,7 @@ import GameControls from '@/components/GameControls.vue';
 import VictoryModal from '@/components/VictoryModal.vue';
 import RestoreGameModal from '@/components/RestoreGameModal.vue';
 import NumberStats from '@/components/NumberStats.vue';
+import SolverLab from '@/components/SolverLab.vue';
 import type { Difficulty } from '@/utils/sudoku';
 
 const {
@@ -118,6 +119,12 @@ function handleDiscard(): void {
   discardSavedGame();
 }
 
+const showSolverLab = ref(false);
+
+function toggleSolverLab(): void {
+  showSolverLab.value = !showSolverLab.value;
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
   checkForSavedGame();
@@ -225,6 +232,21 @@ onUnmounted(() => {
         :hints-remaining="savedHintsRemaining"
         @restore="handleRestore"
         @discard="handleDiscard"
+      />
+
+      <button
+        v-if="!showDifficultySelector && !showRestoreModal"
+        class="solver-lab-btn"
+        @click="toggleSolverLab"
+      >
+        <span class="btn-icon">🧠</span>
+        <span class="btn-text">解题演示</span>
+      </button>
+
+      <SolverLab
+        :visible="showSolverLab"
+        :board="board"
+        @close="showSolverLab = false"
       />
     </div>
   </div>
@@ -434,6 +456,61 @@ onUnmounted(() => {
 
   .keyboard-hint {
     font-size: 10px;
+  }
+}
+
+.solver-lab-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: linear-gradient(145deg, rgba(139, 92, 246, 0.95), rgba(124, 58, 237, 0.95));
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+}
+
+.solver-lab-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5);
+}
+
+.solver-lab-btn:active {
+  transform: translateY(0);
+}
+
+.btn-icon {
+  font-size: 18px;
+}
+
+.btn-text {
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+  .solver-lab-btn {
+    top: 12px;
+    right: 12px;
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .btn-icon {
+    font-size: 16px;
+  }
+
+  .btn-text {
+    display: none;
   }
 }
 </style>

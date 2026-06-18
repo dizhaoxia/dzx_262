@@ -7,6 +7,23 @@ export interface Cell {
   isHint?: boolean;
 }
 
+export type SolverStepType = 'try' | 'conflict' | 'backtrack' | 'confirm' | 'complete';
+
+export interface SolverStep {
+  type: SolverStepType;
+  row: number;
+  col: number;
+  value: number;
+  board: number[][];
+  message: string;
+}
+
+export interface SolverResult {
+  solvable: boolean;
+  solution: number[][] | null;
+  steps: SolverStep[];
+}
+
 function shuffle<T>(array: T[]): T[] {
   const result = [...array];
   for (let i = result.length - 1; i > 0; i--) {
@@ -296,4 +313,145 @@ export function getFilledCount(board: Cell[][]): number {
     }
   }
   return count;
+}
+
+function isValidForSolver(board: number[][], row: number, col: number, num: number): boolean {
+  for (let i = 0; i < 9; i++) {
+    if (board[row][i] === num) return false;
+  }
+  for (let i = 0; i < 9; i++) {
+    if (board[i][col] === num) return false;
+  }
+  const boxRow = Math.floor(row / 3) * 3;
+  const boxCol = Math.floor(col / 3) * 3;
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      if (board[boxRow + i][boxCol + j] === num) return false;
+    }
+  }
+  return true;
+}
+
+function cloneNumberBoard(board: number[][]): number[][] {
+  return board.map(row => [...row]);
+}
+
+function findEmptyCell(board: number[][]): [number, number] | null {
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      if (board[row][col] === 0) return [row, col];
+    }
+  }
+  return null;
+}
+
+function solveWithSteps(
+  board: number[][],
+  steps: SolverStep[]
+): boolean {
+  const empty = findEmptyCell(board);
+  if (!empty) {
+    steps.push({
+      type: 'complete',
+      row: -1,
+      col: -1,
+      value: 0,
+      board: cloneNumberBoard(board),
+      message: '🎉 求解完成！所有格子已填满',
+    });
+    return true;
+  }
+
+  const [row, col] = empty;
+
+  for (let num = 1; num <= 9; num++) {
+    steps.push({
+      type: 'try',
+      row,
+      col,
+      value: num,
+      board: cloneNumberBoard(board),
+      message: `第${row + 1}行第${col + 1}列尝试数字 ${num}`,
+    });
+
+    if (isValidForSolver(board, row, col, num)) {
+      board[row][col] = num;
+
+      steps.push({
+        type: 'confirm',
+        row,
+        col,
+        value: num,
+        board: cloneNumberBoard(board),
+        message: `第${row + 1}行第${col + 1}列确定数字 ${num}`,
+      });
+
+      if (solveWithSteps(board, steps)) {
+        return true;
+      }
+
+      steps.push({
+        type: 'backtrack',
+        row,
+        col,
+        value: num,
+        board: cloneNumberBoard(board),
+        message: `第${row + 1}行第${col + 1}列回溯，撤销数字 ${num}`,
+      });
+
+      board[row][col] = 0;
+    } else {
+      steps.push({
+        type: 'conflict',
+        row,
+        col,
+        value: num,
+        board: cloneNumberBoard(board),
+        message: `第${row + 1}行第${col + 1}列尝试数字 ${num} → 冲突（行/列/宫重复）→ 跳过`,
+      });
+    }
+  }
+
+  return false;
+}
+
+export function solveSudokuWithSteps(inputBoard: number[][]): SolverResult {
+  const board = cloneNumberBoard(inputBoard);
+  const steps: SolverStep[] = [];
+
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      if (board[row][col] !== 0) {
+        const val = board[row][col];
+        board[row][col] = 0;
+        if (!isValidForSolver(board, row, col, val)) {
+          return {
+            solvable: false,
+            solution: null,
+            steps: [{
+              type: 'conflict',
+              row,
+              col,
+              value: val,
+              board: cloneNumberBoard(inputBoard),
+              message: `❌ 输入盘面无效：第${row + 1}行第${col + 1}列的数字 ${val} 存在冲突`,
+            }],
+          };
+        }
+        board[row][col] = val;
+      }
+    }
+  }
+
+  const solvable = solveWithSteps(board, steps);
+
+  return {
+    solvable,
+    solution: solvable ? board : null,
+    steps,
+  };
+}
+
+export function cellBoardToNumberBoard(board: Cell[][]): number[][] {
+  return board.map(row => row.map(cell => cell.value));
 }
