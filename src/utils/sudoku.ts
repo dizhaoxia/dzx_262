@@ -136,6 +136,7 @@ export function generatePuzzle(difficulty: Difficulty): { puzzle: number[][]; so
 }
 
 export function getCandidates(board: Cell[][], row: number, col: number): number[] {
+  if (!board || board.length === 0 || !board[row] || !board[row][col]) return [];
   if (board[row][col].value !== 0) return [];
   
   const used = new Set<number>();
@@ -269,9 +270,14 @@ export function cloneBoard(board: Cell[][]): Cell[][] {
 
 export function countNumbers(board: Cell[][]): Record<number, number> {
   const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
+  if (!board || board.length === 0) return counts;
   for (let row = 0; row < 9; row++) {
+    const r = board[row];
+    if (!r) continue;
     for (let col = 0; col < 9; col++) {
-      const val = board[row][col].value;
+      const cell = r[col];
+      if (!cell) continue;
+      const val = cell.value;
       if (val !== 0) counts[val]++;
     }
   }
@@ -280,9 +286,13 @@ export function countNumbers(board: Cell[][]): Record<number, number> {
 
 export function getFilledCount(board: Cell[][]): number {
   let count = 0;
+  if (!board || board.length === 0) return 0;
   for (let row = 0; row < 9; row++) {
+    const r = board[row];
+    if (!r) continue;
     for (let col = 0; col < 9; col++) {
-      if (board[row][col].value !== 0) count++;
+      const cell = r[col];
+      if (cell && cell.value !== 0) count++;
     }
   }
   return count;

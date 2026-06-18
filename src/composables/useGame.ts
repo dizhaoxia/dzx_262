@@ -69,10 +69,18 @@ export function useGame() {
 
   const hasSelectedCell = computed(() => selectedRow.value !== null && selectedCol.value !== null);
 
-  const numberCounts = computed(() => countNumbers(board));
+  const numberCounts = computed(() =>
+    board && board.length > 0
+      ? countNumbers(board)
+      : { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 }
+  );
 
-  const filledCount = computed(() => getFilledCount(board));
-  const completionPercent = computed(() => Math.round((filledCount.value / 81) * 100));
+  const filledCount = computed(() =>
+    board && board.length > 0 ? getFilledCount(board) : 0
+  );
+  const completionPercent = computed(() =>
+    board && board.length > 0 ? Math.round((filledCount.value / 81) * 100) : 0
+  );
 
   const canUndo = computed(() => history.length > 0 && !isWon.value);
 
