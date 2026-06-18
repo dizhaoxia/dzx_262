@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick, onUnmounted } from 'vue';
-import { X, Play, Pause, SkipBack, SkipForward, RotateCcw, Zap, GripVertical } from 'lucide-vue-next';
+import { X, Play, Pause, ChevronLeft, ChevronRight, RotateCcw, Zap, GripVertical, FastForward, Rewind } from 'lucide-vue-next';
 import type { Cell, SolverStep } from '@/utils/sudoku';
 import { solveSudokuWithSteps, cellBoardToNumberBoard } from '@/utils/sudoku';
 
@@ -44,11 +44,16 @@ const currentStep = computed(() => {
 });
 
 const canPlayForward = computed(() => {
+  if (solverSteps.value.length === 0) return true;
   return currentStepIndex.value < solverSteps.value.length - 1;
 });
 
 const canPlayBackward = computed(() => {
-  return currentStepIndex.value > 0;
+  return currentStepIndex.value >= 0;
+});
+
+const isPrepared = computed(() => {
+  return solverSteps.value.length > 0;
 });
 
 const progress = computed(() => {
@@ -144,8 +149,29 @@ function stepForward() {
 }
 
 function stepBackward() {
-  if (currentStepIndex.value > 0) {
+  prepareSteps();
+  if (currentStepIndex.value >= 0) {
     currentStepIndex.value--;
+    if (currentStepIndex.value >= 0) {
+      updateDisplayBoard();
+    } else {
+      displayBoard.value = originalBoard.value.map(row => [...row]);
+    }
+  }
+}
+
+function jumpToStart() {
+  stopPlayback();
+  prepareSteps();
+  currentStepIndex.value = -1;
+  displayBoard.value = originalBoard.value.map(row => [...row]);
+}
+
+function jumpToEnd() {
+  stopPlayback();
+  prepareSteps();
+  if (solverSteps.value.length > 0) {
+    currentStepIndex.value = solverSteps.value.length - 1;
     updateDisplayBoard();
   }
 }
@@ -272,11 +298,10 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
-            </div>
-            <div class="progress-text">
-              步骤 {{ currentStepIndex + 1 }} / {{ solverSteps.length }}
+            <div class="mini-board-footer">
+              <span class="status-text" :class="{ solved: isSolved }">
+                {{ isSolved ? '✓ 求解完成' : isPrepared ? '演示中...' : '等待开始' }}
+              </span>
             </div>
           </div>
 
@@ -299,6 +324,52 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <div class="step-controls">
+              <div class="step-controls-header">
+                <span class="control-label">分步演示</span>
+                <span v-if="isPrepared" class="step-info">
+                  进度: {{ currentStepIndex + 1 }}/{{ solverSteps.length }}
+                </span>
+                <span v-else class="step-info not-started">
+                  点击"下一步"开始演示
+                </span>
+              </div>
+              <div class="step-buttons-row">
+                <button
+                  class="step-btn prev-btn"
+                  :class="{ disabled: !canPlayBackward }"
+                  :disabled="!canPlayBackward"
+                  @click="stepBackward"
+                >
+                  <ChevronLeft :size="18" />
+                  <span>上一步</span>
+                </button>
+                <button
+                  class="step-btn play-pause-btn"
+                  :disabled="!canPlayForward && !isPlaying"
+                  @click="togglePlayback"
+                >
+                  <Play v-if="!isPlaying" :size="18" />
+                  <Pause v-else :size="18" />
+                  <span>{{ isPlaying ? '暂停' : '自动播放' }}</span>
+                </button>
+                <button
+                  class="step-btn next-btn"
+                  :class="{ disabled: !canPlayForward }"
+                  :disabled="!canPlayForward"
+                  @click="stepForward"
+                >
+                  <span>下一步</span>
+                  <ChevronRight :size="18" />
+                </button>
+              </div>
+              <div v-if="isPrepared" class="progress-bar-container">
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+                </div>
+              </div>
+            </div>
+
             <div class="action-buttons">
               <button class="action-btn solve-btn" @click="solveInstantly">
                 <Zap :size="16" />
@@ -310,28 +381,24 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <div class="playback-controls">
+            <div class="jump-controls">
               <button
-                class="play-btn"
-                :disabled="!canPlayBackward"
-                @click="stepBackward"
+                class="jump-btn"
+                :class="{ disabled: !isPrepared || currentStepIndex <= 0 }"
+                :disabled="!isPrepared || currentStepIndex <= 0"
+                @click="jumpToStart"
               >
-                <SkipBack :size="20" />
+                <Rewind :size="14" />
+                <span>跳到开头</span>
               </button>
               <button
-                class="play-btn main-play"
-                :disabled="solverSteps.length === 0"
-                @click="togglePlayback"
+                class="jump-btn"
+                :class="{ disabled: !isPrepared || currentStepIndex >= solverSteps.length - 1 }"
+                :disabled="!isPrepared || currentStepIndex >= solverSteps.length - 1"
+                @click="jumpToEnd"
               >
-                <Play v-if="!isPlaying" :size="24" />
-                <Pause v-else :size="24" />
-              </button>
-              <button
-                class="play-btn"
-                :disabled="!canPlayForward"
-                @click="stepForward"
-              >
-                <SkipForward :size="20" />
+                <FastForward :size="14" />
+                <span>跳到结尾</span>
               </button>
             </div>
           </div>
@@ -522,9 +589,128 @@ onUnmounted(() => {
   font-family: 'SF Mono', 'Menlo', monospace;
 }
 
+.mini-board-footer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.status-text {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.status-text.solved {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.step-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(51, 65, 85, 0.4);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.step-controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.step-info {
+  font-size: 11px;
+  color: #60a5fa;
+  font-weight: 500;
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.step-info.not-started {
+  color: #fbbf24;
+}
+
+.step-buttons-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.step-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.step-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.step-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.step-btn:disabled,
+.step-btn.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.prev-btn {
+  border-color: #475569;
+  background: linear-gradient(145deg, #334155, #1e293b);
+}
+
+.prev-btn:hover:not(:disabled) {
+  border-color: #64748b;
+  background: linear-gradient(145deg, #475569, #334155);
+}
+
+.next-btn {
+  border-color: #3b82f6;
+  background: linear-gradient(145deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.next-btn:hover:not(:disabled) {
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.play-pause-btn {
+  border-color: #22c55e;
+  background: linear-gradient(145deg, #16a34a, #15803d);
+  color: white;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.play-pause-btn:hover:not(:disabled) {
+  background: linear-gradient(145deg, #22c55e, #16a34a);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.progress-bar-container {
+  width: 100%;
+}
+
 .progress-bar {
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: #334155;
   border-radius: 3px;
   overflow: hidden;
@@ -533,12 +719,7 @@ onUnmounted(() => {
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  font-size: 11px;
-  color: #94a3b8;
+  transition: width 0.25s ease;
 }
 
 .controls-section {
@@ -628,46 +809,37 @@ onUnmounted(() => {
   background: linear-gradient(145deg, #64748b, #475569);
 }
 
-.playback-controls {
+.jump-controls {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-.play-btn {
+.jump-btn {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: none;
-  border-radius: 50%;
-  background: #334155;
-  color: #e2e8f0;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid #475569;
+  background: rgba(51, 65, 85, 0.5);
+  color: #94a3b8;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.play-btn:hover:not(:disabled) {
-  background: #475569;
-  transform: scale(1.05);
+.jump-btn:hover:not(:disabled) {
+  background: rgba(71, 85, 105, 0.7);
+  color: #e2e8f0;
 }
 
-.play-btn:disabled {
-  opacity: 0.4;
+.jump-btn:disabled,
+.jump-btn.disabled {
+  opacity: 0.35;
   cursor: not-allowed;
-}
-
-.play-btn.main-play {
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(145deg, #22c55e, #16a34a);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
-}
-
-.play-btn.main-play:hover:not(:disabled) {
-  background: linear-gradient(145deg, #4ade80, #22c55e);
 }
 
 .logs-section {
